@@ -44,4 +44,12 @@ module.exports = {
         return objectId;
     }
   },
+
+  logger: (payload, error) => {
+    console.info({
+      error,
+      payload,
+      timestamps: new Date().getTime(),
+    });
+  },
 };

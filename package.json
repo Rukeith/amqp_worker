@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "repository": "https://github.com/Rukeith/amqp_worker.git",
-  "author": "rukeith <rukeith@no8.io>",
+  "author": "rukeith",
   "scripts": {
+    "start": "node index.js",
     "dev": "nodemon index.js"
   },
   "license": "MIT",

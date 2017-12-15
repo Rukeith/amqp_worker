@@ -1,31 +1,45 @@
-const mongodb = require('mongodb');
+const { MongoClient } = require('mongodb');
 const config = require('../config.js');
 const { logger } = require('../model/util.js');
 
+let instance;
 class Mongo {
   static async connect() {
-    const db = await mongodb.MongoClient.connect(config.mongoUrl);
-    console.info('####### Worker connected mongodb #######');
-    process.once('SIGINT', () => {
-      logger('process close');
-      db.close();
-    });
-    db.on('close', () => {
-      logger('connect mongodb fail');
-      process.exit(1);
-    });
-    return db;
+    try {
+      await MongoClient.connect(config.mongoUrl, (error, db) => {
+        if (error) {
+          logger('connect mongodb fail', error);
+          return;
+        }
+        logger('connected mongodb');
+        process.once('SIGINT', () => {
+          logger('process close');
+          db.close();
+        });
+        db.on('close', () => {
+          logger('connect mongodb fail');
+          setTimeout(Mongo.connect, 3000);
+        });
+        db.on('reconnect', () => {
+          logger('reconnect mongodb');
+        });
+        instance = db;
+      });
+      return instance;
+    } catch (error) {
+      logger('connect mongodb fail', error);
+    }
   }
 
   constructor() {
     (async () => {
-      try {
-        this.db = await Mongo.connect();
-      } catch (error) {
-        logger('connect mongodb fail', error);
-        process.exit(1);
-      }
+      const db = await Mongo.connect();
+      return db;
     })();
+  }
+
+  getInstance() {
+    return instance;
   }
 }
 

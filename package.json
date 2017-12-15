@@ -1,14 +1,11 @@
 {
-  "name": "amqp_worker",
+  "name": "amqp-worker",
   "version": "1.0.0",
   "main": "index.js",
-  "repository": "https://github.com/Rukeith/amqp_worker.git",
-  "author": "rukeith",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js"
   },
-  "license": "MIT",
   "devDependencies": {
     "babel-eslint": "^8.0.3",
     "eslint": "^4.13.0",
@@ -19,7 +16,7 @@
   "dependencies": {
     "amqplib": "^0.5.2",
     "lodash": "^4.17.4",
-    "mongodb": "^3.0.0-rc0",
+    "mongodb": "2.2.33",
     "objectid": "^3.2.1",
     "uuid": "^3.1.0"
   }

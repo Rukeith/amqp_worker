@@ -46,10 +46,11 @@ module.exports = {
   },
 
   logger: (payload, error) => {
-    console.info({
-      error,
+    const options = {
       payload,
       timestamps: new Date().getTime(),
-    });
+    };
+    if (error) options.error = error;
+    console.info(options);
   },
 };

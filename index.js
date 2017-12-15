@@ -1,56 +1,38 @@
 const conn = require('./init/amqp.js');
-const mongo = require('./init/mongo.js');
+const db = require('./init/mongo.js');
+const { logger } = require('./model/util.js');
+const jobModel = require('./model/job.js');
 
-console.log('conn =', conn);
-console.log('mongo =', mongo);
-// const _ = require('lodash');
-// const amqp = require('amqplib');
-// const { MongoClient } = require('mongodb');
-// const util = require('./model/util.js');
+setTimeout(async () => {
+  const database = db.getInstance();
+  const ch = await conn.createChannel();
+  await Promise.all([
+    ch.assertQueue('proxyConversation', { durable: true }),
+    ch.assertExchange('chat', 'fanout', { durable: false }),
+  ]);
 
-// // Connection URL
-// const url = process.env.MONGO_URL || 'mongodb://localhost:27017/demo';
+  async function proxyConversation(msg) {
+    console.info('Worker receive message =', msg);
+    const { properties, fields } = msg;
+    const { replyTo, correlationId } = properties;
 
-// // Use connect method to connect to the Server
-// MongoClient.connect(url, async (err, db) => {
-//   console.info('####### Worker connected mongodb #######');
+    try {
+      if (!fields.redelivered) {
+        await jobModel.proxyConversation(database, msg);
+      }
+      await ch.publish('chat', '', msg.content, { deliveryMode: 2 });
+      if (replyTo && correlationId) {
+        await ch.sendToQueue(replyTo, Buffer.from('OK'), { correlationId, deliveryMode: true });
+      }
+      logger(JSON.parse(msg.content.toString()));
+      ch.ack(msg);
+    } catch (error) {
+      logger(JSON.parse(msg.content.toString()), error);
+      await ch.sendToQueue('proxyConversation', msg.content);
+      ch.ack(msg);
+    }
+  }
 
-//   const conn = await amqp.connect('amqp://localhost');
-//   console.info('####### Worker connected rabbitmq #######');
-//   process.once('SIGINT', () => conn.close());
-
-//   const ch = await conn.createChannel();
-//   await Promise.all([
-//     ch.assertQueue('proxyConversation', { durable: true }),
-//     ch.assertExchange('fromSocial', 'fanout', { durable: false }),
-//   ]);
-
-//   // Send message to exchange and rpc reply
-//   async function sendExchange(msg) {
-//     const reqId = util.genId();
-//     msg.reqId = reqId;
-
-//     try {
-//       if (msg.fields.redelivered) {
-//         await ch.publish('fromSocial', '', msg.content, { deliveryMode: 2 });
-//         ch.sendToQueue(msg.properties.replyTo, { status: 'OK', reqId: msg.reqId }, { correlationId: msg.properties.correlationId });
-//         ch.ack(msg);
-//         return;
-//       }
-
-//       const body = msg.content.toSting();
-//       const params = JSON.parse(body);
-
-//       if (!_.has(params, 'unpublish') || params.unpublish === false) {
-//         await ch.publish('fromSocial', '', msg.content, { deliveryMode: 2 });
-//         ch.sendToQueue(msg.properties.replyTo, { status: 'OK', reqId }, { correlationId: msg.properties.correlationId });
-//       }
-//       ch.ack(msg);
-//     } catch (error) {
-//       console.info('####### Worker [x] error #######', error);
-//       ch.nack(msg);
-//     }
-//   }
-//   ch.consume('proxyConversation', sendExchange, { noAck: false });
-//   console.info(' [*] Waiting for messages. To exit press CTRL+C');
-// });
+  await ch.consume('proxyConversation', proxyConversation, { noAck: false });
+  logger('Worker start');
+}, 2000);
